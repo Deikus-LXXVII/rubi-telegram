@@ -12,9 +12,12 @@ import (
 	"github.com/Deikus-LXXVII/rubi/sdk/rubiplugin"
 )
 
+// Accounts as Rubi keeps them: the stable id from Settings.RubiAccountID, the name as label.
 const (
-	meAcct  = "@me_on_tg"
-	botAcct = "@rubi_test_bot (bot)"
+	meAcct   = "user:42"
+	meLabel  = "@me_on_tg"
+	botAcct  = "bot:900"
+	botLabel = "@rubi_test_bot (bot)"
 )
 
 // setupAccounts connects a personal account (the default) and a bot, both on fakes.
@@ -24,7 +27,7 @@ func setupAccounts(t *testing.T) (*integration, *fakeBase, *fakeUser, *fakeBotAP
 	useFakeUser(t, u, testAPIHash, testSession)
 	api := startBotAPI(t)
 	b := &fakeBase{
-		accounts: []rubiplugin.AccountInfo{{ID: meAcct, Label: meAcct, Default: true}, {ID: botAcct, Label: botAcct}},
+		accounts: []rubiplugin.AccountInfo{{ID: meAcct, Label: meLabel, Default: true}, {ID: botAcct, Label: botLabel}},
 		settings: map[string]Settings{
 			meAcct:  {Kind: kindUserAccount, ID: 42, Username: "me_on_tg", APIID: testAPIID, Phone: "+447700900123"},
 			botAcct: {Kind: kindBotAccount, ID: 900, Username: "rubi_test_bot"},
@@ -191,7 +194,7 @@ func TestChatAccessGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := b.takePending(t)
-	if req.Kind != kindChat || req.Preview.(map[string]any)["account"] != meAcct {
+	if req.Kind != kindChat || req.Preview.(map[string]any)["account"] != meLabel {
 		t.Fatalf("access request: %+v", req)
 	}
 	if a, _ := action(kindChat); !a.Locked || a.DefaultLevel != rubiplugin.Strong {
@@ -230,7 +233,7 @@ func TestSendNeedsApproval(t *testing.T) {
 	}
 	req := b.takePending(t)
 	pv := req.Preview.(map[string]any)
-	if req.Kind != kindSend || pv["account"] != meAcct || pv["chat"] != "Anna Smith (@anna)" || pv["text"] != "See you at 1!" {
+	if req.Kind != kindSend || pv["account"] != meLabel || pv["chat"] != "Anna Smith (@anna)" || pv["text"] != "See you at 1!" {
 		t.Fatalf("preview: %+v", req)
 	}
 	out := approve(t, b, req, "send_track", x.send)
@@ -246,7 +249,7 @@ func TestSendNeedsApproval(t *testing.T) {
 	u.deliver(message{ID: 3000, ChatID: 101, ChatTitle: "Anna Smith", FromID: 101, From: "Anna Smith", FromUsername: "anna",
 		Date: time.Now().UTC(), Text: "Great!"})
 	ev := b.takeEvents()
-	if len(ev) != 1 || ev[0].typ != "reply" || ev[0].data["account"] != meAcct {
+	if len(ev) != 1 || ev[0].typ != "reply" || ev[0].data["account"] != meLabel {
 		t.Fatalf("reply events: %+v", ev)
 	}
 	if msg := ev[0].data["message"].(map[string]any); msg["text"] != "Great!" || msg["from"] != "Anna Smith" {
@@ -326,8 +329,9 @@ func TestWatchWakesAgent(t *testing.T) {
 		t.Fatalf("private watch event: %s", raw)
 	}
 
-	// Closed chats wake nobody.
+	// Closed chats wake nobody. (The settings are cached; Rubi tells the plugin when they change.)
 	b.setConfig(meAcct, "chat_access", "selected")
+	x.configChanged(meAcct)
 	m.ID, m.Text = 15, "parcel"
 	u.deliver(m)
 	if ev := b.takeEvents(); len(ev) != 0 {
@@ -374,7 +378,7 @@ func TestBotPollingStoresUpdates(t *testing.T) {
 	}
 	// bot_wake (default on): every message wakes the subscribed Bots; the code one only as private.
 	ev := b.takeEvents()
-	if len(ev) != 3 || ev[0].agent != "" || ev[0].data["account"] != botAcct {
+	if len(ev) != 3 || ev[0].agent != "" || ev[0].data["account"] != botLabel {
 		t.Fatalf("events: %+v", ev)
 	}
 	raw, _ := json.Marshal(ev)
@@ -475,7 +479,7 @@ func TestSeveralAccounts(t *testing.T) {
 			t.Fatalf("%q: %s", ref, a.id)
 		}
 	}
-	if _, err := accountFor(b, "@nobody"); err == nil || !strings.Contains(err.Error(), botAcct) {
+	if _, err := accountFor(b, "@nobody"); err == nil || !strings.Contains(err.Error(), botLabel) {
 		t.Fatalf("unknown account: %v", err)
 	}
 	kinds := asMap(t, must(listAccounts(b)))["accounts"].([]any)
@@ -512,7 +516,7 @@ func TestSeveralAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := b.takePending(t)
-	if !strings.HasSuffix(req.Summary, "("+botAcct+")") {
+	if !strings.HasSuffix(req.Summary, "("+botLabel+")") {
 		t.Fatalf("summary: %s", req.Summary)
 	}
 	approve(t, b, req, "send", x.send)

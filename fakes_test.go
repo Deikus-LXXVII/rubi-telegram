@@ -31,6 +31,9 @@ type fakeBase struct {
 	levels   map[string]rubiplugin.Level
 	pending  []rubiplugin.Request
 	events   []event
+
+	secretWrites int
+	configReads  int
 }
 
 type event struct {
@@ -58,18 +61,45 @@ func (b *fakeBase) SettingsFor(account string, v any) error {
 	return json.Unmarshal(raw, v)
 }
 
+// SecretFor answers like Rubi: an Internal secret that isn't set comes back empty, without an error.
 func (b *fakeBase) SecretFor(account, key string) (string, error) {
-	v := b.secrets[b.ref(account)][key]
-	if v == "" {
-		return "", fmt.Errorf("secret %q is not set", key)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, s := range manifest().Secrets {
+		if s.Key == key {
+			return b.secrets[b.ref(account)][key], nil
+		}
 	}
-	return v, nil
+	return "", fmt.Errorf("secret %q is not declared in the manifest", key)
+}
+
+// SetSecretFor replaces an Internal secret, like Rubi.
+func (b *fakeBase) SetSecretFor(account, key, value string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	internal := false
+	for _, s := range manifest().Secrets {
+		internal = internal || s.Key == key && s.Internal
+	}
+	if !internal {
+		return fmt.Errorf("secret %q isn't an internal secret", key)
+	}
+	b.secrets[b.ref(account)][key] = value
+	b.secretWrites++
+	return nil
+}
+
+func (b *fakeBase) secret(account, key string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.secrets[account][key]
 }
 
 // ConfigFor merges the manifest defaults with what the test set, like Rubi does.
 func (b *fakeBase) ConfigFor(account string, v any) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.configReads++
 	cfg := map[string]any{}
 	for _, f := range manifest().Config {
 		cfg[f.Key] = f.Default
@@ -197,17 +227,18 @@ func asMap(t *testing.T, v any) map[string]any {
 
 // fakeUser is a connected personal account with a few chats.
 type fakeUser struct {
-	mu      sync.Mutex
-	chats   []chatInfo
-	msgs    map[int64][]message // chat → messages, oldest first
-	sent    []message
-	drafts  []message
-	nextID  int
-	calls   int
-	closed  bool
-	onMsg   func(message)
-	selfID  int64
-	history []string // calls made, e.g. "history 101"
+	mu        sync.Mutex
+	chats     []chatInfo
+	msgs      map[int64][]message // chat → messages, oldest first
+	sent      []message
+	drafts    []message
+	nextID    int
+	calls     int
+	closed    bool
+	onMsg     func(message)
+	onSession func(string)
+	selfID    int64
+	history   []string // calls made, e.g. "history 101"
 }
 
 func newFakeUser() *fakeUser {
@@ -355,6 +386,7 @@ func useFakeUser(t *testing.T, u *fakeUser, wantHash, wantSession string) *int {
 		dials++
 		u.mu.Lock()
 		u.onMsg = onMessage
+		u.onSession = cfg.OnSession
 		u.mu.Unlock()
 		return u, nil
 	}

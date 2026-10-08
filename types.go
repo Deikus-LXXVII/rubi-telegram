@@ -20,6 +20,10 @@ type Settings struct {
 	Phone string `json:"phone,omitempty"`
 }
 
+// RubiAccountID gives the account a stable id in Rubi (rubiplugin.AccountIDer): the bot's or the user's
+// Telegram id, so a changed @username doesn't make a second account and setting it up again updates it.
+func (s Settings) RubiAccountID() string { return s.Kind + ":" + strconv.FormatInt(s.ID, 10) }
+
 const (
 	kindBotAccount  = "bot"
 	kindUserAccount = "user"
@@ -107,6 +111,9 @@ type userConfig struct {
 	APIID   int
 	APIHash string
 	Session string
+	// OnSession is called with the new encoded session whenever Telegram's library stores one (a data
+	// center migration, a new auth key), so the plugin can save it.
+	OnSession func(session string)
 }
 
 // Seams for tests.

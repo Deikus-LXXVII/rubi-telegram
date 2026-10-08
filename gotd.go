@@ -34,8 +34,9 @@ var device = telegram.DeviceConfig{DeviceModel: "Rubi", SystemVersion: "Rubi plu
 
 // memSession is a session.Storage in memory; the plugin saves its content in the account's secret.
 type memSession struct {
-	mu   sync.Mutex
-	data []byte
+	mu      sync.Mutex
+	data    []byte
+	onStore func(data []byte) // optional: told about every new session
 }
 
 func (s *memSession) LoadSession(context.Context) ([]byte, error) {
@@ -49,8 +50,13 @@ func (s *memSession) LoadSession(context.Context) ([]byte, error) {
 
 func (s *memSession) StoreSession(_ context.Context, data []byte) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	changed := string(s.data) != string(data)
 	s.data = append([]byte(nil), data...)
+	fn := s.onStore
+	s.mu.Unlock()
+	if changed && fn != nil {
+		fn(append([]byte(nil), data...))
+	}
 	return nil
 }
 
@@ -282,6 +288,9 @@ func gotdConnect(ctx context.Context, cfg userConfig, onMessage func(message)) (
 		return nil, errSessionRevoked
 	}
 	store := &memSession{data: raw}
+	if cfg.OnSession != nil {
+		store.onStore = func(data []byte) { cfg.OnSession(base64.StdEncoding.EncodeToString(data)) }
+	}
 	u := &gotdUser{peers: map[int64]tg.InputPeerClass{}, chats: map[int64]chatInfo{}, names: map[int64]userName{}}
 	d := tg.NewUpdateDispatcher()
 	handle := func(e tg.Entities, msg tg.MessageClass) {

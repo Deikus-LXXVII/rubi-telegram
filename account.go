@@ -20,6 +20,7 @@ import (
 type base interface {
 	SettingsFor(account string, v any) error
 	SecretFor(account, key string) (string, error)
+	SetSecretFor(account, key, value string) error
 	ConfigFor(account string, v any) error
 	Accounts() ([]rubiplugin.AccountInfo, error)
 	LoadState(v any) error
@@ -103,6 +104,7 @@ func accountFor(b base, ref string) (*account, error) {
 
 func (a *account) Settings(v any) error               { return a.b.SettingsFor(a.id, v) }
 func (a *account) Secret(key string) (string, error)  { return a.b.SecretFor(a.id, key) }
+func (a *account) SetSecret(key, value string) error  { return a.b.SetSecretFor(a.id, key, value) }
 func (a *account) Config(v any) error                 { return a.b.ConfigFor(a.id, v) }
 func (a *account) Level(kind string) rubiplugin.Level { return a.b.Level(kind) }
 func (a *account) Logf(format string, args ...any)    { a.b.Logf("["+a.label+"] "+format, args...) }
@@ -211,11 +213,11 @@ func (a *account) SaveState(v any) error {
 }
 
 // addTool registers a tool that works on one account, picked by the account argument.
-func addTool[T any](p *rubiplugin.Plugin, name, description string, ref func(T) string,
+func addTool[T any](p *rubiplugin.Plugin, x *integration, name, description string, ref func(T) string,
 	fn func(ctx context.Context, a *account, in T) (any, error)) {
 	rubiplugin.AddTool(p, tool(name), description,
 		func(ctx context.Context, h *rubiplugin.Host, in T) (any, error) {
-			a, err := accountFor(h, ref(in))
+			a, err := accountFor(x.wrap(h), ref(in))
 			if err != nil {
 				return nil, err
 			}
@@ -224,9 +226,9 @@ func addTool[T any](p *rubiplugin.Plugin, name, description string, ref func(T) 
 }
 
 // onExecute runs an approved action on the account it was requested for.
-func onExecute(p *rubiplugin.Plugin, kind string, fn func(ctx context.Context, a *account, option string, payload json.RawMessage) (any, error)) {
+func onExecute(p *rubiplugin.Plugin, x *integration, kind string, fn func(ctx context.Context, a *account, option string, payload json.RawMessage) (any, error)) {
 	p.OnExecute(kind, func(ctx context.Context, h *rubiplugin.Host, option string, payload json.RawMessage) (any, error) {
-		return execute(ctx, h, option, payload, fn)
+		return execute(ctx, x.wrap(h), option, payload, fn)
 	})
 }
 

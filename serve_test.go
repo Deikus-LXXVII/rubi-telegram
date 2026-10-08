@@ -45,7 +45,7 @@ func TestServeSetupOverJSONRPC(t *testing.T) {
 	res = call(3, "validate", rubiplugin.ValidateParams{
 		Fields:  map[string]string{"kind": "bot", rubiplugin.StepField: more["step"].(string)},
 		Secrets: declaredSecrets(map[string]string{"bot_token": testToken})})
-	if res["account"] != "@rubi_test_bot (bot)" || res["secrets"].(map[string]any)["bot_token"] != testToken {
+	if res["account"] != "@rubi_test_bot (bot)" || res["account_id"] != "bot:900" || res["secrets"].(map[string]any)["bot_token"] != testToken {
 		t.Fatalf("validate 2: %v", res)
 	}
 }

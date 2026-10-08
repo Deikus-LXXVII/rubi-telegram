@@ -16,9 +16,13 @@ type integration struct {
 	mu     sync.Mutex // the plugin state (load, change, save)
 	logins logins
 
-	cmu   sync.Mutex
-	users map[string]*userSlot // account id → connection
-	bots  map[string]botAPI    // account id → Bot API client
+	cmu    sync.Mutex
+	users  map[string]*userSlot     // account id → connection
+	bots   map[string]botAPI        // account id → Bot API client
+	savers map[string]*sessionSaver // account id → renewed-session writer
+
+	cfgMu sync.Mutex
+	cfg   map[string]cachedConfig // account id → user-only settings
 
 	stop chan struct{}
 	ctx  context.Context
@@ -50,7 +54,7 @@ func (x *integration) Start(b base) error {
 	x.ctx, x.quit = context.WithCancel(context.Background())
 	stop, ctx := x.stop, x.ctx
 	x.cmu.Unlock()
-	list, err := accounts(b)
+	list, err := accounts(x.wrap(b))
 	if err != nil {
 		return err
 	}
@@ -72,8 +76,8 @@ func (x *integration) Stop() {
 		x.quit()
 		x.stop = nil
 	}
-	slots := x.users
-	x.users, x.bots = nil, nil
+	slots, savers := x.users, x.savers
+	x.users, x.bots, x.savers = nil, nil, nil
 	x.cmu.Unlock()
 	for _, s := range slots {
 		s.mu.Lock()
@@ -84,7 +88,11 @@ func (x *integration) Stop() {
 		s.mu.Unlock()
 	}
 	x.wg.Wait()
+	for _, s := range savers {
+		s.flush() // don't lose a session renewed just before stopping
+	}
 	x.logins.closeAll()
+	x.configChanged("")
 }
 
 func sleep(stop <-chan struct{}, d time.Duration) bool {
@@ -145,9 +153,13 @@ func (x *integration) user(ctx context.Context, a *account) (userClient, error) 
 	if err != nil {
 		return nil, err
 	}
+	if sess == "" || hash == "" {
+		return nil, errSessionRevoked
+	}
+	saver := x.saverFor(a, sess)
 	dctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	c, err := connectUser(dctx, userConfig{APIID: s.APIID, APIHash: hash, Session: sess}, func(m message) {
+	c, err := connectUser(dctx, userConfig{APIID: s.APIID, APIHash: hash, Session: sess, OnSession: saver.store}, func(m message) {
 		x.onUserMessage(a, m)
 	})
 	if err != nil {
@@ -220,6 +232,9 @@ func (x *integration) botAPIFor(a *account) (botAPI, error) {
 	token, err := a.Secret("bot_token")
 	if err != nil {
 		return nil, err
+	}
+	if token == "" {
+		return nil, errors.New("this bot has no token stored; connect it again in the Rubi panel")
 	}
 	api := newBotAPI(token)
 	if x.bots == nil {
