@@ -1,0 +1,6 @@
+/telegram
+/dist/
+go.work
+go.work.sum
+.DS_Store
+/rubi-telegram

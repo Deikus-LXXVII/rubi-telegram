@@ -1,0 +1,74 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PLUGIN: telegram
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          ldflags="-s -w -buildid= -X github.com/Deikus-LXXVII/rubi/sdk/rubiplugin.Version=${GITHUB_REF_NAME}"
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/arm64; do
+            os=${target%/*}; arch=${target#*/}
+            out="work/$os-$arch"
+            mkdir -p "$out"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o "$out/$PLUGIN" .
+            tar --owner=0 --group=0 --numeric-owner --mtime=@0 -C "$out" -czf "dist/$PLUGIN-$os-$arch.tar.gz" "$PLUGIN"
+          done
+          # The manifest comes from the code, with the tag as its version.
+          go build -trimpath -ldflags "$ldflags" -o work/host .
+          ./work/host --manifest > dist/rubi-plugin.json
+          test "$(python3 -c 'import json;print(json.load(open("dist/rubi-plugin.json"))["version"])')" = "$GITHUB_REF_NAME"
+          cd dist
+          sha256sum rubi-plugin.json "$PLUGIN"-*.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Sign checksums
+        env:
+          PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PLUGIN_SIGNING_KEY" || { echo "PLUGIN_SIGNING_KEY secret is not set"; exit 1; }
+          umask 077
+          printf '%s\n' "$PLUGIN_SIGNING_KEY" > "$RUNNER_TEMP/key.pem"
+          openssl pkeyutl -sign -inkey "$RUNNER_TEMP/key.pem" -rawin -in dist/SHA256SUMS -out dist/SHA256SUMS.sig
+          rm -f "$RUNNER_TEMP/key.pem"
+          # Must verify with the key the manifest declares.
+          openssl pkeyutl -verify -pubin -inkey publisher-key.pub.pem -rawin -in dist/SHA256SUMS -sigfile dist/SHA256SUMS.sig
+          key=$(sed -n 2p publisher-key.pub.pem)
+          grep -q "\"key\": \"$key\"" dist/rubi-plugin.json || { echo "manifest publisher key differs from publisher-key.pub.pem"; exit 1; }
+
+      - name: Provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/*.tar.gz, dist/rubi-plugin.json"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/rubi-plugin.json dist/*.tar.gz dist/SHA256SUMS dist/SHA256SUMS.sig \
+            --title "$GITHUB_REF_NAME" --generate-notes
+          echo "### For the Rubi store catalog" >> "$GITHUB_STEP_SUMMARY"
+          echo "sums_sha256: \`$(sha256sum dist/SHA256SUMS | cut -d' ' -f1)\`" >> "$GITHUB_STEP_SUMMARY"
+          sha256sum dist/SHA256SUMS
