@@ -102,9 +102,18 @@ func accountFor(b base, ref string) (*account, error) {
 	return nil, fmt.Errorf("no connected Telegram account %q; connected: %s", ref, strings.Join(names, ", "))
 }
 
-func (a *account) Settings(v any) error               { return a.b.SettingsFor(a.id, v) }
-func (a *account) Secret(key string) (string, error)  { return a.b.SecretFor(a.id, key) }
-func (a *account) SetSecret(key, value string) error  { return a.b.SetSecretFor(a.id, key, value) }
+func (a *account) Settings(v any) error              { return a.b.SettingsFor(a.id, v) }
+func (a *account) Secret(key string) (string, error) { return a.b.SecretFor(a.id, key) }
+
+// SetSecret replaces an account's secret. Only "session" may ever be written: bot_token and api_hash are
+// entered by the user and are declared Internal only so setup can ask for them in a later step, so Rubi
+// would let the plugin overwrite them. (Rubi will add an explicit flag for plugin-written secrets.)
+func (a *account) SetSecret(key, value string) error {
+	if key != "session" {
+		return fmt.Errorf("the plugin doesn't write the secret %q", key)
+	}
+	return a.b.SetSecretFor(a.id, key, value)
+}
 func (a *account) Config(v any) error                 { return a.b.ConfigFor(a.id, v) }
 func (a *account) Level(kind string) rubiplugin.Level { return a.b.Level(kind) }
 func (a *account) Logf(format string, args ...any)    { a.b.Logf("["+a.label+"] "+format, args...) }

@@ -478,6 +478,13 @@ func (u *gotdUser) convert(mc tg.MessageClass) (message, bool) {
 			m.ReplyTo = h.ReplyToMsgID
 		}
 		from, _ = x.GetFromID()
+		if fwd, ok := x.GetFwdFrom(); ok {
+			if p, ok := fwd.GetFromID(); ok {
+				m.FwdFromID = markPeer(p)
+			} else if p, ok := fwd.GetSavedFromPeer(); ok {
+				m.FwdFromID = markPeer(p)
+			}
+		}
 	case *tg.MessageService:
 		m = message{ID: x.ID, ChatID: markPeer(x.PeerID), Out: x.Out, Date: time.Unix(int64(x.Date), 0).UTC(),
 			Text: "[service: " + strings.TrimPrefix(x.Action.TypeName(), "messageAction") + "]"}

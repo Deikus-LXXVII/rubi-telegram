@@ -56,7 +56,7 @@ var (
 
 // hidden reports whether a message must stay hidden from the agent, and why (for the user's eyes only).
 func (p privacyConfig) hidden(m message) (bool, string) {
-	if m.FromID == serviceID || m.ChatID == serviceID {
+	if m.fromService() {
 		return true, "Telegram service message (login codes)"
 	}
 	for _, c := range p.Chats {
@@ -134,7 +134,7 @@ func wordRune(r rune) bool { return r != utf8.RuneError && (unicode.IsLetter(r) 
 // doesn't look like a code itself, or the id.
 func (p privacyConfig) senderOnly(m message) string {
 	switch {
-	case m.FromID == serviceID || m.ChatID == serviceID:
+	case m.fromService():
 		return "Telegram (service notifications)"
 	case m.FromUsername != "":
 		return "@" + m.FromUsername

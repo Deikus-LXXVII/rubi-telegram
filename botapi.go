@@ -65,11 +65,17 @@ type botMessage struct {
 	ReplyToMessage *struct {
 		MessageID int `json:"message_id"`
 	} `json:"reply_to_message,omitempty"`
-	Photo    json.RawMessage `json:"photo,omitempty"`
-	Document json.RawMessage `json:"document,omitempty"`
-	Voice    json.RawMessage `json:"voice,omitempty"`
-	Video    json.RawMessage `json:"video,omitempty"`
-	Sticker  json.RawMessage `json:"sticker,omitempty"`
+	ForwardOrigin *struct {
+		SenderUser *botUser     `json:"sender_user,omitempty"`
+		Chat       *botChatInfo `json:"chat,omitempty"`
+		SenderChat *botChatInfo `json:"sender_chat,omitempty"`
+	} `json:"forward_origin,omitempty"`
+	ForwardFrom *botUser        `json:"forward_from,omitempty"` // older Bot API versions
+	Photo       json.RawMessage `json:"photo,omitempty"`
+	Document    json.RawMessage `json:"document,omitempty"`
+	Voice       json.RawMessage `json:"voice,omitempty"`
+	Video       json.RawMessage `json:"video,omitempty"`
+	Sticker     json.RawMessage `json:"sticker,omitempty"`
 }
 
 type botUpdate struct {
@@ -99,6 +105,18 @@ func (m *botMessage) toMessage(own int64) message {
 		out.Out = m.From.ID == own
 	case m.SenderChat != nil:
 		out.FromID, out.From, out.FromUsername = m.SenderChat.ID, m.SenderChat.Title, m.SenderChat.Username
+	}
+	if o := m.ForwardOrigin; o != nil {
+		switch {
+		case o.SenderUser != nil:
+			out.FwdFromID = o.SenderUser.ID
+		case o.Chat != nil:
+			out.FwdFromID = o.Chat.ID
+		case o.SenderChat != nil:
+			out.FwdFromID = o.SenderChat.ID
+		}
+	} else if m.ForwardFrom != nil {
+		out.FwdFromID = m.ForwardFrom.ID
 	}
 	if m.ReplyToMessage != nil {
 		out.ReplyTo = m.ReplyToMessage.MessageID

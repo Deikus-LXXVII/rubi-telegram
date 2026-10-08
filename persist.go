@@ -122,14 +122,10 @@ func (c *cachedBase) ConfigFor(account string, v any) error {
 	return json.Unmarshal(e.raw, v)
 }
 
-// configChanged drops cached settings: one account's, or all ("" = plugin-wide settings changed).
-func (x *integration) configChanged(account string) {
+// configChanged drops the cached settings of every account, whichever account Rubi names: an account's
+// view includes the plugin-wide fields (the privacy filter), and the cache is cheap to refill.
+func (x *integration) configChanged(string) {
 	x.cfgMu.Lock()
 	defer x.cfgMu.Unlock()
-	if account == "" {
-		x.cfg = nil
-		return
-	}
-	delete(x.cfg, account)
-	delete(x.cfg, "") // the default account may be this one
+	x.cfg = nil
 }

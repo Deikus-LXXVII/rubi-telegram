@@ -57,7 +57,7 @@ func manifest() rubiplugin.Manifest {
 		Secrets:   []rubiplugin.Secret{botTokenSecret, apiHashSecret, sessionSecret},
 		Actions: []rubiplugin.Action{
 			{Kind: kindRead, Title: "Read chats and messages", DefaultLevel: rubiplugin.None},
-			{Kind: kindDraft, Title: "Save drafts (personal accounts)", DefaultLevel: rubiplugin.None},
+			{Kind: kindDraft, Title: "Save a draft in a chat (personal accounts; may replace your unsent text)", DefaultLevel: rubiplugin.Chat},
 			{Kind: kindSend, Title: "Send a Telegram message", DefaultLevel: rubiplugin.Strong, Options: sendOptions},
 			{Kind: kindWatch, Title: "Watch for new messages (wakes your agent)", DefaultLevel: rubiplugin.None},
 			{Kind: kindPrivate, Title: "Show a private message", DefaultLevel: rubiplugin.Strong, Locked: true,
@@ -118,7 +118,7 @@ func newPlugin(x *integration) *rubiplugin.Plugin {
 	addTool(p, x, "send", "Send a text message. Nothing is sent until the user approves (by default in the Rubi panel with their passkey); the approval also asks whether to notify you of replies. From a personal account the message comes from the user; from a bot, from the bot (which can only write to people and groups that started it).",
 		func(in sendIn) string { return in.Account },
 		func(ctx context.Context, a *account, in sendIn) (any, error) { return x.requestSend(ctx, a, in) })
-	addTool(p, x, "draft", "Save a draft in a chat's input field in the user's Telegram apps; it isn't sent. Personal accounts only.",
+	addTool(p, x, "draft", "Save a draft in a chat's input field in the user's Telegram apps (replacing any unsent text there); it isn't sent. The user approves it (by default with buttons in the chat). Personal accounts only.",
 		func(in draftIn) string { return in.Account },
 		func(ctx context.Context, a *account, in draftIn) (any, error) { return x.draft(ctx, a, in) })
 	addTool(p, x, "watch", "Watch for new messages and get woken for each match: from chats or people (ids, @usernames, titles) and/or containing words. Pass your Bot name as agent and a note on what to do. Each match wakes you (costs the user's quota), so keep watches specific and remove them when done. (A bot account may also wake you for every message it gets, if the user allows.)",

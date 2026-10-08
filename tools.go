@@ -399,11 +399,16 @@ func (x *integration) draft(ctx context.Context, a *account, in draftIn) (any, e
 	if err != nil {
 		return nil, err
 	}
+	// A draft sits in the chat's input field and may replace one the user is writing: only in chats the
+	// agent may see.
+	if err := x.chatAllowed(a, chat.ID); err != nil {
+		return nil, err
+	}
 	p := sendPayload{ChatID: chat.ID, ChatTitle: chat.Title, Text: text, ReplyTo: in.ReplyTo}
 	if a.Level(kindDraft) == rubiplugin.None {
 		return x.saveDraft(ctx, a, p)
 	}
-	return a.Submit(ctx, rubiplugin.Request{Kind: kindDraft, Summary: "Save a Telegram draft in " + chat.Title,
+	return a.Submit(ctx, rubiplugin.Request{Kind: kindDraft, Summary: "Save a Telegram draft in " + chat.Title + " (replaces any unsent text there)",
 		Preview: map[string]any{"chat": chatLabel(chat), "text": text},
 		Options: []rubiplugin.Option{{Key: "save", Label: "Save draft"}}, Payload: p})
 }
@@ -429,6 +434,11 @@ type revealIn struct {
 	Reason  string  `json:"reason" jsonschema:"why you need them, shown to the user"`
 	Account string  `json:"account,omitempty" jsonschema:"which connected Telegram account (as telegram_accounts lists it); default: the default one"`
 }
+
+// errNoServiceReveal: Telegram's own messages (777000) carry its login codes, which whoever has them can use
+// to take over the account. No approval can show them to the agent.
+var errNoServiceReveal = errors.New("messages from Telegram itself (777000, login codes) can never be shown to you, " +
+	"even with the user's approval; the user must read them in their Telegram app")
 
 type revealPayload struct {
 	ChatID int64  `json:"chat_id"`
@@ -487,6 +497,9 @@ func (x *integration) requestReveal(ctx context.Context, a *account, in revealIn
 	if err != nil {
 		return nil, err
 	}
+	if chat.ID == serviceID {
+		return nil, errNoServiceReveal
+	}
 	if err := x.chatAllowed(a, chat.ID); err != nil {
 		return nil, err
 	}
@@ -499,6 +512,9 @@ func (x *integration) requestReveal(ctx context.Context, a *account, in revealIn
 	payload := revealPayload{ChatID: chat.ID, Reason: reason}
 	var notPrivate []int
 	for _, m := range msgs {
+		if m.fromService() {
+			return nil, errNoServiceReveal
+		}
 		hidden, why := p.hidden(m)
 		if !hidden {
 			notPrivate = append(notPrivate, m.ID)
@@ -555,9 +571,17 @@ func (x *integration) reveal(ctx context.Context, a *account, option string, pay
 	if len(ids) == 0 {
 		return map[string]any{"messages": []message{}}, nil
 	}
+	if in.ChatID == serviceID {
+		return nil, errNoServiceReveal
+	}
 	msgs, err := x.fetch(ctx, a, in.ChatID, ids)
 	if err != nil {
 		return nil, err
+	}
+	for _, m := range msgs { // checked again: whatever was approved, these never leave
+		if m.fromService() {
+			return nil, errNoServiceReveal
+		}
 	}
 	for _, m := range msgs {
 		a.Audit("private_revealed", map[string]any{"chat_id": in.ChatID, "message_id": m.ID})

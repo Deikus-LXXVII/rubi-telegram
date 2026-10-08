@@ -59,8 +59,15 @@ type message struct {
 	Date         time.Time `json:"date"`
 	Text         string    `json:"text,omitempty"`
 	ReplyTo      int       `json:"reply_to,omitempty"`
-	Media        string    `json:"media,omitempty"` // photo, document, … (not downloaded)
+	FwdFromID    int64     `json:"fwd_from_id,omitempty"` // a forward: the original sender or chat
+	Media        string    `json:"media,omitempty"`       // photo, document, … (not downloaded)
 	Private      bool      `json:"private,omitempty"`
+}
+
+// fromService reports whether a message comes from Telegram's own account, directly, in its chat, or
+// forwarded. Such messages carry Telegram login codes: always hidden, and never revealed.
+func (m message) fromService() bool {
+	return m.FromID == serviceID || m.ChatID == serviceID || m.FwdFromID == serviceID
 }
 
 // selfInfo is the logged-in user or bot.

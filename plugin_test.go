@@ -501,8 +501,16 @@ func TestSeveralAccounts(t *testing.T) {
 	if _, err := x.draft(ctx, bot, draftIn{Chat: "1", Text: "x"}); err == nil {
 		t.Fatal("a bot saved a draft")
 	}
-	if _, err := x.draft(ctx, me, draftIn{Chat: "@anna", Text: "Draft text"}); err != nil || len(u.drafts) != 1 {
+	if _, err := x.draft(ctx, me, draftIn{Chat: "@anna", Text: "Draft text"}); err != nil || len(u.drafts) != 0 {
 		t.Fatalf("draft: %v %v", err, u.drafts)
+	}
+	approve(t, b, b.takePending(t), "save", func(ctx context.Context, a *account, _ string, p json.RawMessage) (any, error) {
+		var d sendPayload
+		_ = json.Unmarshal(p, &d)
+		return x.saveDraft(ctx, a, d)
+	})
+	if len(u.drafts) != 1 || u.drafts[0].ChatID != 101 {
+		t.Fatalf("approved draft: %v", u.drafts)
 	}
 
 	// Approvals name the account; executing goes to the account it was asked for.

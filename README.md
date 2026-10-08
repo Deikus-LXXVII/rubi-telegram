@@ -6,7 +6,7 @@ by Telegram. You can connect a bot, your personal account, or several of each:
 
 - see your recent chats with unread counts, and read messages (never marks anything as read);
 - search your messages (personal accounts);
-- save a draft in a chat, where you'll find it in your Telegram apps (personal accounts);
+- save a draft in a chat, where you'll find it in your Telegram apps, after you approve it (personal accounts);
 - send messages only after you approve each one in the Rubi panel (with your passkey by default), and
   optionally get notified when someone replies;
 - let your agent watch for new messages from given chats or people, or with given words, and react to
@@ -76,7 +76,7 @@ Connecting your **personal account** uses Telegram's API the way unofficial Tele
 |---|---|
 | Asks for | for a bot: its token; for your account: api_id, api_hash, phone number, login code, two-step verification password (not stored) |
 | Read chats and messages | no approval by default |
-| Save drafts (personal accounts) | no approval by default |
+| Save a draft in a chat (personal accounts; may replace your unsent text) | buttons in the agent chat by default |
 | Send a Telegram message | passkey / password by default |
 | Watch for new messages (wakes your agent) | no approval by default |
 | Show a private message | passkey / password, always |
@@ -93,7 +93,8 @@ Right after connecting, and later in the Rubi panel under *Settings*, at each Te
 - **Chats your agent can see** (for each account): all, or only the ones you check; and whether it may
   ask for the others. Access you approve lasts an hour or a day.
 - **Hide sign-in codes, one-time passwords and confirmation links:** on by default. Messages from Telegram
-  itself (the 777000 account that sends your Telegram login codes) are always hidden, whatever you choose.
+  itself (the 777000 account that sends your Telegram login codes), and messages forwarded from it, are
+  always hidden, whatever you choose, and can never be shown to your agent, not even with your approval.
 - **Hide password reset messages:** on by default.
 - **Hide sign-in and security alerts:** off by default, so your agent can warn you about new sign-ins or
   suspicious activity. (An alert that contains a code stays hidden by the first switch.)
