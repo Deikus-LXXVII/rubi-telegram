@@ -120,7 +120,7 @@ var apiHashSecret = rubiplugin.Secret{Key: "api_hash", Label: "api_hash", Intern
 	Help:    "From my.telegram.org > API development tools, next to api_id. Never share it.",
 	HelpURL: "https://my.telegram.org", HelpLink: "Open my.telegram.org"}
 
-var sessionSecret = rubiplugin.Secret{Key: "session", Label: "Telegram session", Internal: true,
+var sessionSecret = rubiplugin.Secret{Key: "session", Label: "Telegram session", Internal: true, Renewable: true,
 	Help: "Filled in by Rubi after you log in."}
 
 const personalIntro = "To connect your personal account, Rubi needs your own Telegram API keys. " +
