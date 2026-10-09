@@ -2,7 +2,7 @@ module github.com/Deikus-LXXVII/rubi-telegram
 
 go 1.26.4
 
-require github.com/Deikus-LXXVII/rubi v0.4.1
+require github.com/Deikus-LXXVII/rubi v0.6.0
 
 require (
 	github.com/andybalholm/brotli v1.2.1 // indirect

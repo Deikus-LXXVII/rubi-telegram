@@ -1,5 +1,5 @@
-github.com/Deikus-LXXVII/rubi v0.4.1 h1:H3H16EE1Y5DV+wnim6tFZCK08k7tj/GUMVoJYFNZ4fw=
-github.com/Deikus-LXXVII/rubi v0.4.1/go.mod h1:V4vcdM5M6oH91U4IGMZZP3EsDoi55rJZf4Pa9dbOZhM=
+github.com/Deikus-LXXVII/rubi v0.6.0 h1:V5IETGKkymWalQ+79UTHpnFM4acsZCiVCW5Qu4mIsLw=
+github.com/Deikus-LXXVII/rubi v0.6.0/go.mod h1:T/ueWF1gaN5RLJn9yTAHv8HcSs+qCk/Zz/x7DE0l+Qk=
 github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=
 github.com/andybalholm/brotli v1.2.1/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
